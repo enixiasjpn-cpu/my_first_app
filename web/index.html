@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>VlogCam</title>
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="VlogCam">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- 上部：グリッド・ライト・時刻・フィルター -->
+    <header class="topbar">
+      <button id="btn-grid" class="icon" aria-label="グリッド">
+        <svg viewBox="0 0 24 24"><path d="M4 9h16M4 15h16M9 4v16M15 4v16" /></svg>
+      </button>
+      <button id="btn-torch" class="icon hidden" aria-label="ライト">
+        <svg viewBox="0 0 24 24"><path d="M13 3 5 14h6l-1 7 8-11h-6z" /></svg>
+      </button>
+      <div class="spacer"></div>
+      <button id="btn-time" class="chip active hidden">時刻 ON</button>
+      <button id="btn-filter" class="chip">NORMAL</button>
+    </header>
+
+    <!-- 中央：プレビュー（＝保存される映像そのもの） -->
+    <main id="stage">
+      <div id="preview-main" class="preview">
+        <canvas id="canvas-main"></canvas>
+        <div class="grid hidden"></div>
+        <div class="blink"></div>
+        <div class="badge hidden">9:16</div>
+        <div id="rec-timer" class="rec-timer hidden"><span class="dot"></span><span class="time">00:00</span></div>
+      </div>
+      <div id="preview-wide" class="preview hidden">
+        <canvas id="canvas-wide"></canvas>
+        <div class="grid hidden"></div>
+        <div class="blink"></div>
+        <div class="badge">16:9</div>
+      </div>
+      <div id="camera-message" class="camera-message hidden">
+        <p>カメラを起動できませんでした</p>
+        <button id="btn-retry" class="primary">タップしてカメラを起動</button>
+      </div>
+    </main>
+
+    <!-- 下部：ズーム・モード・素材一覧・シャッター・カメラ切替 -->
+    <footer class="controls">
+      <button id="btn-zoom" class="pill">1x</button>
+      <nav class="modes">
+        <button data-mode="vlog" class="selected">VLOG</button>
+        <button data-mode="video">VIDEO</button>
+        <button data-mode="photo">PHOTO</button>
+      </nav>
+      <div class="row">
+        <button id="btn-library" class="library-thumb" aria-label="素材一覧"></button>
+        <button id="shutter" class="shutter mode-vlog" aria-label="撮影">
+          <svg class="ring" viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" /></svg>
+          <span class="inner"></span>
+        </button>
+        <button id="btn-switch" class="icon round" aria-label="カメラ切り替え">
+          <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3M18 3v4h-4M6 21v-4h4" /></svg>
+        </button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- 撮影直後の保存バー（VIDEO / PHOTO） -->
+  <div id="save-bar" class="save-bar hidden">
+    <span class="label"></span>
+    <button class="primary">写真アプリに保存</button>
+    <button class="close" aria-label="閉じる">×</button>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- 素材一覧 -->
+  <section id="library" class="sheet hidden">
+    <header class="sheet-header">
+      <button class="text-button" data-close>閉じる</button>
+      <div class="tabs">
+        <button data-tab="vlog" class="selected">VLOG</button>
+        <button data-tab="media">VIDEO・PHOTO</button>
+      </div>
+      <span class="sheet-header-spacer"></span>
+    </header>
+    <div id="tab-vlog" class="tab">
+      <div class="day-select-wrap"><select id="day-select"></select></div>
+      <div id="clip-grid" class="grid-list"></div>
+      <p id="clip-empty" class="empty hidden">まだ動画がありません<br><small>VLOGモードで撮影すると、ここに追加されます</small></p>
+      <div class="bottom-action">
+        <button id="btn-save-day" class="primary large">今日のVLOGを保存</button>
+      </div>
+    </div>
+    <div id="tab-media" class="tab hidden">
+      <div id="media-grid" class="grid-list"></div>
+      <p id="media-empty" class="empty hidden">VIDEO・PHOTOで撮ったものがここに表示されます</p>
+    </div>
+  </section>
+
+  <!-- 再生・個別保存・削除 -->
+  <section id="viewer" class="sheet hidden">
+    <header class="sheet-header">
+      <button class="text-button" data-close>閉じる</button>
+      <span id="viewer-title" class="sheet-title"></span>
+      <button id="btn-delete" class="text-button danger">削除</button>
+    </header>
+    <div class="viewer-body">
+      <video id="viewer-video" playsinline controls class="hidden"></video>
+      <img id="viewer-image" class="hidden" alt="">
+    </div>
+    <div class="bottom-action">
+      <button id="btn-save-one" class="primary large">この動画を保存</button>
+    </div>
+  </section>
+
+  <video id="camera" class="offscreen" playsinline muted autoplay></video>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
