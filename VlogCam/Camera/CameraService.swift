@@ -352,7 +352,6 @@ final class CameraService: NSObject, @unchecked Sendable {
             ).prefix(urls.count))
 
             let audioSettings = self.audioOutput.recommendedAudioSettingsForAssetWriter(writingTo: .mov)
-                as? [String: Any]
             do {
                 let recorders = try zip(urls, specs).map { url, spec in
                     try MovieRecorder(
