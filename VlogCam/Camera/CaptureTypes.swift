@@ -17,21 +17,6 @@ enum CaptureMode: String, CaseIterable, Identifiable {
     }
 }
 
-/// VIDEOモードの出力アスペクト比
-enum VideoAspect: String, CaseIterable, Identifiable {
-    case portrait9x16
-    case landscape16x9
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .portrait9x16: return "9:16"
-        case .landscape16x9: return "16:9"
-        }
-    }
-}
-
 /// 端末の物理的な向き（画面の回転ロックに関係なく加速度センサーで判定）
 enum DeviceOrientation {
     case portrait

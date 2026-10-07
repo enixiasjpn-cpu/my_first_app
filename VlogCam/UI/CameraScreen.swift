@@ -42,21 +42,41 @@ struct CameraScreen: View {
 
     // MARK: - Layout
 
+    @ViewBuilder
     private var cameraContent: some View {
-        ZStack(alignment: .top) {
-            preview
+        if camera.mode == .video {
+            dualContent
+        } else {
+            ZStack(alignment: .top) {
+                previewSurface(sink: camera.service.previewSinks[0], aspect: 9 / 16, label: nil)
 
-            VStack(spacing: 0) {
-                topBar
-                Spacer()
-                bottomControls
+                VStack(spacing: 0) {
+                    topBar
+                    Spacer()
+                    bottomControls
+                }
             }
         }
     }
 
-    private var preview: some View {
-        CameraPreviewView(sink: camera.service.previewSink)
-            .aspectRatio(9 / 16, contentMode: .fit)
+    /// VIDEO: 上に 9:16、下に 16:9 を同時表示。録画すると両方が同時に保存される。
+    private var dualContent: some View {
+        VStack(spacing: 8) {
+            topBar
+            previewSurface(sink: camera.service.previewSinks[0], aspect: 9 / 16, label: "9:16")
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .frame(maxHeight: .infinity)
+            previewSurface(sink: camera.service.previewSinks[1], aspect: 16 / 9, label: "16:9")
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .padding(.horizontal, 8)
+                .layoutPriority(1)
+            bottomControls
+        }
+    }
+
+    private func previewSurface(sink: PreviewSink, aspect: CGFloat, label: String?) -> some View {
+        CameraPreviewView(sink: sink)
+            .aspectRatio(aspect, contentMode: .fit)
             .overlay {
                 if camera.gridOn { GridOverlay() }
             }
@@ -65,10 +85,22 @@ struct CameraScreen: View {
                     .opacity(shutterBlink ? 0.6 : 0)
                     .allowsHitTesting(false)
             }
+            .overlay(alignment: .topTrailing) {
+                if let label {
+                    Text(label)
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(.black.opacity(0.35), in: Capsule())
+                        .padding(8)
+                }
+            }
             .overlay(alignment: .top) {
-                if camera.isRecording, camera.mode == .video, let start = camera.recordingStartedAt {
+                if camera.isRecording, camera.mode == .video, label == "9:16",
+                   let start = camera.recordingStartedAt {
                     RecordingTimer(start: start)
-                        .padding(.top, 60)
+                        .padding(.top, 8)
                 }
             }
             .contentShape(Rectangle())
@@ -98,13 +130,6 @@ struct CameraScreen: View {
             }
 
             Spacer()
-
-            if camera.mode == .video {
-                ChipButton(title: camera.aspect.title) {
-                    camera.aspect = camera.aspect == .portrait9x16 ? .landscape16x9 : .portrait9x16
-                }
-                .disabled(camera.isRecording)
-            }
 
             if camera.mode == .photo {
                 ChipButton(

@@ -16,19 +16,25 @@ final class PreviewSink: @unchecked Sendable {
         set { lock.lock(); _layer = newValue; lock.unlock() }
     }
 
-    /// カメラのデータキューから呼ぶ
-    func enqueue(_ image: CIImage, at time: CMTime, context: CIContext) {
+    /// 加工済みフレームを表示用バッファに描画して表示する。カメラのデータキューから呼ぶ。
+    /// 録画中はこのバッファをそのまま動画にも書き込むため、表示できない時もバッファは返す。
+    @discardableResult
+    func render(_ image: CIImage, at time: CMTime, context: CIContext) -> CVPixelBuffer? {
+        let size = CGSize(width: image.extent.width.rounded(), height: image.extent.height.rounded())
+        guard size.width > 0, size.height > 0, let pixelBuffer = makePixelBuffer(size: size) else { return nil }
+
+        context.render(image, to: pixelBuffer, bounds: CGRect(origin: .zero, size: size), colorSpace: colorSpace)
+        display(pixelBuffer, at: time)
+        return pixelBuffer
+    }
+
+    private func display(_ pixelBuffer: CVPixelBuffer, at time: CMTime) {
         guard let layer else { return }
         let renderer = layer.sampleBufferRenderer
         if renderer.status == .failed {
             renderer.flush()
         }
         guard renderer.isReadyForMoreMediaData else { return }
-
-        let size = CGSize(width: image.extent.width.rounded(), height: image.extent.height.rounded())
-        guard size.width > 0, size.height > 0, let pixelBuffer = makePixelBuffer(size: size) else { return }
-
-        context.render(image, to: pixelBuffer, bounds: CGRect(origin: .zero, size: size), colorSpace: colorSpace)
 
         var formatDescription: CMVideoFormatDescription?
         CMVideoFormatDescriptionCreateForImageBuffer(
@@ -77,7 +83,7 @@ final class PreviewSink: @unchecked Sendable {
             var newPool: CVPixelBufferPool?
             CVPixelBufferPoolCreate(
                 kCFAllocatorDefault,
-                [kCVPixelBufferPoolMinimumBufferCountKey as String: 3] as CFDictionary,
+                [kCVPixelBufferPoolMinimumBufferCountKey as String: 6] as CFDictionary,
                 attributes as CFDictionary,
                 &newPool
             )

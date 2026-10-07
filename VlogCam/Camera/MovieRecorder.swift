@@ -1,5 +1,4 @@
 import AVFoundation
-import CoreImage
 
 enum MovieRecorderError: LocalizedError {
     case noFrames
@@ -25,7 +24,6 @@ final class MovieRecorder {
     private let videoInput: AVAssetWriterInput
     private let adaptor: AVAssetWriterInputPixelBufferAdaptor
     private let audioInput: AVAssetWriterInput?
-    private let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
 
     private(set) var startTime: CMTime?
     private var lastVideoTime: CMTime?
@@ -82,41 +80,28 @@ final class MovieRecorder {
         }
     }
 
-    /// 加工済みフレームを1枚書き込む。
-    /// - Returns: maxDuration に達した（このフレームは書き込まず、録画を終えるべき）場合 true
-    @discardableResult
-    func appendVideo(_ image: CIImage, at time: CMTime, context: CIContext) -> Bool {
-        guard !isFinishing else { return false }
+    /// 最初のフレームから maxDuration に達したか（VLOG の2秒）
+    func hasReachedMaxDuration(at time: CMTime) -> Bool {
+        guard let maxDuration, let startTime else { return false }
+        return CMTimeCompare(CMTimeSubtract(time, startTime), maxDuration) >= 0
+    }
+
+    /// 加工済みフレーム（時刻・フィルター適用後）を1枚書き込む
+    func appendVideo(_ pixelBuffer: CVPixelBuffer, at time: CMTime) {
+        guard !isFinishing else { return }
 
         if startTime == nil {
-            guard writer.startWriting() else { return false }
+            guard writer.startWriting() else { return }
             writer.startSession(atSourceTime: time)
             startTime = time
         }
-        guard let startTime else { return false }
+        guard !hasReachedMaxDuration(at: time),
+              writer.status == .writing,
+              videoInput.isReadyForMoreMediaData else { return }
 
-        if let maxDuration, CMTimeCompare(CMTimeSubtract(time, startTime), maxDuration) >= 0 {
-            return true
-        }
-
-        guard writer.status == .writing,
-              videoInput.isReadyForMoreMediaData,
-              let pool = adaptor.pixelBufferPool else { return false }
-
-        var pixelBuffer: CVPixelBuffer?
-        CVPixelBufferPoolCreatePixelBuffer(nil, pool, &pixelBuffer)
-        guard let pixelBuffer else { return false }
-
-        context.render(
-            image,
-            to: pixelBuffer,
-            bounds: CGRect(origin: .zero, size: outputSize),
-            colorSpace: colorSpace
-        )
         if adaptor.append(pixelBuffer, withPresentationTime: time) {
             lastVideoTime = time
         }
-        return false
     }
 
     func appendAudio(_ sampleBuffer: CMSampleBuffer) {

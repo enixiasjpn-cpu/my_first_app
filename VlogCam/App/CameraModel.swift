@@ -17,9 +17,14 @@ final class CameraModel {
 
     var authorization: Authorization = .unknown
 
-    var mode: CaptureMode = .vlog { didSet { pushSettings() } }
+    var mode: CaptureMode = .vlog {
+        didSet {
+            pushSettings()
+            // VIDEO は 4K 取り込みに切り替える（16:9 を切り抜いても画質を保つため）
+            service.updateForModeChange { [weak self] in self?.zoom = 1 }
+        }
+    }
     var filter: FilterKind = .normal { didSet { pushSettings() } }
-    var aspect: VideoAspect = .portrait9x16 { didSet { pushSettings() } }
     var photoTimeEnabled = true { didSet { pushSettings() } }
 
     var flashOn = false
@@ -42,7 +47,6 @@ final class CameraModel {
         service.settings = CaptureSettings(
             mode: mode,
             filter: filter,
-            aspect: aspect,
             photoTimeEnabled: photoTimeEnabled
         )
     }
@@ -97,7 +101,7 @@ final class CameraModel {
         if flashOn { service.setTorch(true) }
 
         service.startRecording(
-            to: ClipStore.newClipURL(id: id),
+            to: [ClipStore.newClipURL(id: id)],
             maxDuration: VlogConfig.clipDuration,
             timeText: HourLabel.text(for: startedAt)
         ) { [weak self] result in
@@ -114,28 +118,37 @@ final class CameraModel {
         }
     }
 
+    /// 9:16 と 16:9 の2本を同時に録画し、停止後に両方を写真アプリへ保存する
     private func startVideo() {
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("video-\(UUID().uuidString).mov")
+        let stamp = UUID().uuidString
+        let urls = ["9x16", "16x9"].map {
+            FileManager.default.temporaryDirectory.appendingPathComponent("video-\(stamp)-\($0).mov")
+        }
         isRecording = true
         recordingStartedAt = Date()
         if flashOn { service.setTorch(true) }
 
-        service.startRecording(to: url, maxDuration: nil, timeText: nil) { [weak self] result in
+        service.startRecording(to: urls, maxDuration: nil, timeText: nil) { [weak self] result in
             guard let self else { return }
             self.isRecording = false
             self.recordingStartedAt = nil
             self.service.setTorch(false)
             switch result {
-            case .success(let url):
+            case .success(let savedURLs):
                 Task {
                     do {
-                        try await PhotoLibrarySaver.saveVideo(at: url)
-                        self.showToast("写真アプリに保存しました")
+                        for url in savedURLs {
+                            try await PhotoLibrarySaver.saveVideo(at: url)
+                        }
+                        self.showToast(savedURLs.count > 1
+                            ? "9:16 と 16:9 を写真アプリに保存しました"
+                            : "写真アプリに保存しました")
                     } catch {
                         self.showToast(error.localizedDescription)
                     }
-                    try? FileManager.default.removeItem(at: url)
+                    for url in savedURLs {
+                        try? FileManager.default.removeItem(at: url)
+                    }
                 }
             case .failure(let error):
                 self.showToast(error.localizedDescription)
