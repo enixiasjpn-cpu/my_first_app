@@ -1,5 +1,5 @@
 // オフラインでも起動できるようにアプリ本体をキャッシュする（更新はネット優先）
-const CACHE = 'vlogcam-v4';
+const CACHE = 'vlogcam-v5';
 const ASSETS = [
   './',
   './index.html',
@@ -34,7 +34,8 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) return;
   event.respondWith(
-    fetch(request)
+    // ブラウザのキャッシュを使わず、毎回サーバーに最新か確認する
+    fetch(request, { cache: 'no-cache' })
       .then((response) => {
         const copy = response.clone();
         caches.open(CACHE).then((c) => c.put(request, copy));

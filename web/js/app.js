@@ -5,6 +5,9 @@ import { concatenate } from './composer.js';
 import * as store from './store.js';
 import { toast, shareToPhotos } from './ui.js';
 
+// アプリのバージョン（更新したら上げる）
+const APP_VERSION = '1.5';
+
 const CLIP_DURATION_MS = 2000;
 const SIZES = {
   vlog: [1920, 1080], // VLOG は横 16:9
@@ -498,7 +501,43 @@ document.addEventListener('click', () => {
 
 // ---------------------------------------------------------------- 起動
 
+/**
+ * 「更新」ボタン：最新版を読み込み直す。撮った動画・写真（IndexedDB）は消えない。
+ */
+async function updateApp() {
+  const button = $('#btn-update');
+  button.textContent = '更新中…';
+  button.disabled = true;
+  try {
+    const regs = navigator.serviceWorker ? await navigator.serviceWorker.getRegistrations() : [];
+    await Promise.all(regs.map((r) => r.update().catch(() => {})));
+  } catch (_) {
+    // 無視して続行
+  }
+  try {
+    const keys = await caches.keys();
+    await Promise.all(keys.map((k) => caches.delete(k)));
+  } catch (_) {
+    // 無視して続行
+  }
+  try {
+    sessionStorage.setItem('vlogcam-updated', '1');
+  } catch (_) {
+    // 無視して続行
+  }
+  location.reload();
+}
+
 async function init() {
+  $('#btn-update').addEventListener('click', updateApp);
+  try {
+    if (sessionStorage.getItem('vlogcam-updated')) {
+      sessionStorage.removeItem('vlogcam-updated');
+      setTimeout(() => toast(`最新版にしました（ver ${APP_VERSION}）`), 600);
+    }
+  } catch (_) {
+    // 無視
+  }
   document.documentElement.style.setProperty('--clip-duration', `${CLIP_DURATION_MS}ms`);
   store.requestPersistence();
   const clips = await store.allClips();
