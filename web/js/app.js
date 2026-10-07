@@ -106,12 +106,12 @@ async function setTorch(on) {
 
 // ---------------------------------------------------------------- 描画
 
+/** VIDEO と PHOTO は 9:16 と 16:9 を同時に表示・保存する */
+function isDualMode() {
+  return state.mode === 'video' || state.mode === 'photo';
+}
+
 function outputSizeForMain() {
-  if (state.mode === 'photo') {
-    const vw = els.camera.videoWidth || 1080;
-    const vh = els.camera.videoHeight || 1920;
-    return vw > vh ? [1440, 1080] : [1080, 1440];
-  }
   if (state.mode === 'vlog') return SIZES.vlog;
   return SIZES.portrait;
 }
@@ -133,7 +133,7 @@ function renderFrame() {
     zoom: state.zoom,
   };
   const ok = mainRenderer.render(els.camera, opts);
-  if (state.mode === 'video') {
+  if (isDualMode()) {
     wideRenderer.setSize(...SIZES.wide);
     wideRenderer.render(els.camera, opts);
   }
@@ -170,7 +170,7 @@ function layout() {
     return [Math.floor(w), Math.floor(h)];
   };
 
-  if (state.mode === 'video') {
+  if (isDualMode()) {
     const landscape = sw > sh;
     els.stage.style.flexDirection = landscape ? 'row' : 'column';
     let ww, wh, mw, mh;
@@ -304,33 +304,40 @@ async function toggleVideo() {
   if (state.torch) setTorch(true);
 }
 
-/** PHOTO */
+/** PHOTO：VIDEO と同じく 9:16 と 16:9 の2枚を同時に撮る */
 async function takePhoto() {
-  const text = state.photoTime ? store.hourLabel(Date.now()) : null;
+  const now = Date.now();
+  const text = state.photoTime ? store.hourLabel(now) : null;
   state.recording = { kind: 'photo', frozenText: text, filter: state.filter };
   renderFrame();
-  const dataURL = els.canvasMain.toDataURL('image/jpeg', 0.92);
-  const thumb = thumbnailFrom(els.canvasMain);
+  const shots = [
+    { canvas: els.canvasMain, ratio: '9x16' },
+    { canvas: els.canvasWide, ratio: '16x9' },
+  ].map(({ canvas, ratio }) => ({
+    ratio,
+    dataURL: canvas.toDataURL('image/jpeg', 0.92),
+    thumb: thumbnailFrom(canvas),
+  }));
   state.recording = null;
 
-  document.querySelectorAll('#preview-main .blink').forEach((b) => {
+  document.querySelectorAll('.preview .blink').forEach((b) => {
     b.classList.remove('on');
     void b.offsetWidth;
     b.classList.add('on');
   });
 
-  const blob = dataURLToBlob(dataURL);
-  const item = {
+  const stamp = fileStamp(now);
+  const items = shots.map((shot) => ({
     id: store.newId(),
     kind: 'photo',
-    createdAt: Date.now(),
-    blob,
+    createdAt: now,
+    blob: dataURLToBlob(shot.dataURL),
     mime: 'image/jpeg',
-    name: `PHOTO-${fileStamp(Date.now())}.jpg`,
-    thumb,
-  };
-  await store.putMedia(item);
-  offerSave([item], '写真を撮影しました');
+    name: `PHOTO-${stamp}-${shot.ratio}.jpg`,
+    thumb: shot.thumb,
+  }));
+  for (const item of items) await store.putMedia(item);
+  offerSave(items, '9:16 と 16:9 を撮影しました');
 }
 
 function fileStamp(time) {
@@ -365,8 +372,9 @@ function setMode(mode) {
   document.querySelectorAll('.modes button').forEach((b) => b.classList.toggle('selected', b.dataset.mode === mode));
   els.shutter.className = `shutter mode-${mode}`;
   els.time.classList.toggle('hidden', mode !== 'photo');
-  els.previewWide.classList.toggle('hidden', mode !== 'video');
-  els.previewMain.querySelector('.badge').classList.toggle('hidden', mode !== 'video');
+  const dual = mode === 'video' || mode === 'photo';
+  els.previewWide.classList.toggle('hidden', !dual);
+  els.previewMain.querySelector('.badge').classList.toggle('hidden', !dual);
   lastLayoutKey = '';
 }
 

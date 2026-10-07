@@ -187,7 +187,8 @@ async function renderMedia() {
     cell.style.backgroundSize = 'contain';
     const tag = document.createElement('span');
     tag.className = 'tag';
-    tag.textContent = item.kind === 'photo' ? 'PHOTO' : item.name.includes('16x9') ? '16:9' : '9:16';
+    const ratio = item.name.includes('16x9') ? '16:9' : '9:16';
+    tag.textContent = item.kind === 'photo' ? `PHOTO ${ratio}` : ratio;
     cell.appendChild(tag);
     cell.addEventListener('click', () => openViewer({ type: 'media', item }));
     els.mediaGrid.appendChild(cell);

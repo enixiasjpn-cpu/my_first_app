@@ -87,6 +87,7 @@ button:disabled { opacity: 0.35; }
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 .chip.active { color: var(--accent); }
 
@@ -393,9 +394,10 @@ button:disabled { opacity: 0.35; }
   .topbar {
     flex-direction: column;
     height: auto;
-    width: 64px;
+    width: 96px;
     padding: 12px 8px;
   }
+  .topbar .chip { padding: 0 8px; font-size: 12px; }
   #stage { padding: 8px 0; }
   .controls {
     flex-direction: row;
