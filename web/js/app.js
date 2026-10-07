@@ -1,4 +1,4 @@
-import { FrameRenderer, drawTimeText } from './renderer.js';
+import { FrameRenderer } from './renderer.js';
 import { FILTERS } from './filters.js';
 import { startRecording, extensionFor, canvasVideoTrack } from './recorder.js';
 import { concatenate } from './composer.js';
@@ -6,7 +6,7 @@ import * as store from './store.js';
 import { toast, shareToPhotos } from './ui.js';
 
 // アプリのバージョン（更新したら上げる）
-const APP_VERSION = '1.5';
+const APP_VERSION = '1.6';
 
 const CLIP_DURATION_MS = 2000;
 const SIZES = {
@@ -334,25 +334,20 @@ async function takePhoto() {
 }
 
 /**
- * VIDEO 録画中に写真を撮る。動画は止めずに、今のフレーム（9:16 / 16:9）を写真にする。
- * 動画には時刻を入れないので、写真の時刻 ON の時だけ写真側に時刻を描き足す。
+ * VIDEO 録画中に写真を撮る。動画は止めずに、今のフレーム（9:16 / 16:9）をそのまま写真にする。
+ * VIDEO と同じく時刻は入れない。
  */
 async function snapDuringVideo() {
   if (!state.recording || state.recording.kind !== 'video') return;
   const now = Date.now();
-  const text = state.photoTime ? store.hourLabel(now) : null;
   const shots = [
     { canvas: els.canvasMain, ratio: '9x16' },
     { canvas: els.canvasWide, ratio: '16x9' },
-  ].map(({ canvas, ratio }) => {
-    const copy = document.createElement('canvas');
-    copy.width = canvas.width;
-    copy.height = canvas.height;
-    const ctx = copy.getContext('2d');
-    ctx.drawImage(canvas, 0, 0);
-    if (text) drawTimeText(ctx, copy.width, copy.height, text);
-    return { ratio, dataURL: copy.toDataURL('image/jpeg', 0.92), thumb: thumbnailFrom(copy) };
-  });
+  ].map(({ canvas, ratio }) => ({
+    ratio,
+    dataURL: canvas.toDataURL('image/jpeg', 0.92),
+    thumb: thumbnailFrom(canvas),
+  }));
   const rec = state.recording;
   const items = await savePhotos(shots, now);
   rec.snaps.push(...items);
