@@ -3,7 +3,7 @@ name: Build
 on:
   push:
     branches: ["**"]
-    paths-ignore: ["web/**", ".github/workflows/pages.yml"]
+    paths-ignore: ["web/**"]
   workflow_dispatch:
 
 jobs:

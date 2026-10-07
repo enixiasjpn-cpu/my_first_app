@@ -15,7 +15,7 @@ iPhone の Safari で開くだけで使えるブラウザ版。Mac・パソコ�
   - 連結後・撮影後の保存は、ボタンをもう一度押して共有メニューから行います（ブラウザの制限）
   - ズームはデジタルズーム、ライトは iPhone の Safari では使えません
   - 16:9 は縦の映像の中央を切り抜くため画質が下がります
-- 公開：`main` / 開発ブランチへの push で GitHub Pages に自動デプロイ（`.github/workflows/pages.yml`）
+- 公開：GitHub Pages（Deploy from a branch / root）→ `https://enixiasjpn-cpu.github.io/my_first_app/web/`
 
 ## iPhone へのインストール（Mac なし・Windows + 無料 Apple ID）
 
