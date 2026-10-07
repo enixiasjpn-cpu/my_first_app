@@ -2,19 +2,19 @@
 
 旅行・イベント・日常で、短い動画や写真を簡単に撮影し、時間情報付きの VLOG として残す iPhone 用カメラアプリ。
 
-## 必要な環境
+## iPhone へのインストール（Mac なし・Windows + 無料 Apple ID）
 
-- Mac + Xcode 16 以降
-- iPhone（iOS 17 以降）※カメラを使うためシミュレーターでは動作しません
+1. GitHub の **Actions** タブ → 最新の「Build」→ 下部 **Artifacts** の `VlogCam-ipa` をダウンロードして解凍（`VlogCam.ipa`）
+2. Windows に [Sideloadly](https://sideloadly.io/) と、Apple 公式サイト版の iTunes / iCloud をインストール
+3. iPhone を USB でつなぎ、Sideloadly に `VlogCam.ipa` をドラッグ → Apple ID を入力 → **Start**
+4. iPhone で「設定 > プライバシーとセキュリティ > デベロッパモード」をオン（再起動あり）
+5. 「設定 > 一般 > VPNとデバイス管理」で自分の Apple ID を信頼
 
-## ビルド手順
+無料 Apple ID では **7日ごとに入れ直し** が必要です（同じ手順で上書きインストール。アプリ内の動画は残ります）。
 
-1. `VlogCam.xcodeproj` を Xcode で開く
-2. ターゲット **VlogCam** → **Signing & Capabilities** で
-   - **Team** に自分の Apple ID（Personal Team で可）を選択
-   - 必要なら **Bundle Identifier**（初期値 `com.example.vlogcam`）を自分用に変更
-3. iPhone を接続して実行先に選び、▶︎ で実行
-4. 初回はカメラ・マイク、保存時に写真へのアクセスを許可
+## Mac がある場合
+
+`VlogCam.xcodeproj` を Xcode 16 以降で開き、Signing & Capabilities の Team に Apple ID を設定して実行（iOS 17 以降）。
 
 ## 技術構成
 

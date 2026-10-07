@@ -15,17 +15,34 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
-      - name: Build (iOS, no code signing)
+      # 署名なしでビルドする（Sideloadly 等でインストール時に自分の Apple ID で署名する）
+      - name: Build (iOS, unsigned)
         run: |
           set -o pipefail
           xcodebuild \
             -project VlogCam.xcodeproj \
             -target VlogCam \
-            -configuration Debug \
+            -configuration Release \
             -sdk iphoneos \
             CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
             build | tee build.log | grep -E "error:|warning:|BUILD" || true
           grep -q "BUILD SUCCEEDED" build.log
+
+      - name: Package IPA
+        run: |
+          mkdir -p Payload
+          cp -R build/Release-iphoneos/VlogCam.app Payload/
+          zip -qry VlogCam.ipa Payload
+          ls -lh VlogCam.ipa
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: VlogCam-ipa
+          path: VlogCam.ipa
+          retention-days: 30
 
       - name: Upload build log
         if: always()
