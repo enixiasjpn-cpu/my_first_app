@@ -63,9 +63,15 @@
           <svg class="ring" viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" /></svg>
           <span class="inner"></span>
         </button>
-        <button id="btn-switch" class="icon round" aria-label="カメラ切り替え">
-          <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3M18 3v4h-4M6 21v-4h4" /></svg>
-        </button>
+        <div class="row-end">
+          <button id="btn-switch" class="icon round" aria-label="カメラ切り替え">
+            <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3M18 3v4h-4M6 21v-4h4" /></svg>
+          </button>
+          <!-- VIDEO 録画中だけ表示：動画を撮りながら写真を撮る -->
+          <button id="btn-snap" class="snap hidden" aria-label="録画中に写真を撮る">
+            <span></span>
+          </button>
+        </div>
       </div>
     </footer>
   </div>

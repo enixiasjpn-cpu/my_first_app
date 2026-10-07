@@ -66,6 +66,20 @@ function makeTexture(gl) {
   return texture;
 }
 
+/** 時刻文字（白・セミボールド・ごく薄い影）を中央に描く。動画・写真で共通。 */
+export function drawTimeText(ctx, w, h, text) {
+  ctx.save();
+  const fontSize = Math.round(Math.min(w, h) * 0.2);
+  ctx.font = `600 ${fontSize}px -apple-system, "SF Pro Display", "Helvetica Neue", "Hiragino Sans", Arial, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#ffffff';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.25)';
+  ctx.shadowBlur = fontSize * 0.08;
+  ctx.fillText(text, w / 2, h / 2);
+  ctx.restore();
+}
+
 export class FrameRenderer {
   constructor(canvas) {
     this.canvas = canvas;
@@ -134,14 +148,7 @@ export class FrameRenderer {
     tc.height = h;
     const ctx = tc.getContext('2d');
     ctx.clearRect(0, 0, w, h);
-    const fontSize = Math.round(Math.min(w, h) * 0.2);
-    ctx.font = `600 ${fontSize}px -apple-system, "SF Pro Display", "Helvetica Neue", "Hiragino Sans", Arial, sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#ffffff';
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.25)';
-    ctx.shadowBlur = fontSize * 0.08;
-    ctx.fillText(text, w / 2, h / 2);
+    drawTimeText(ctx, w, h, text);
 
     const gl = this.gl;
     gl.activeTexture(gl.TEXTURE1);

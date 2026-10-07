@@ -1,4 +1,4 @@
-import { FrameRenderer } from './renderer.js';
+import { FrameRenderer, drawTimeText } from './renderer.js';
 import { FILTERS } from './filters.js';
 import { startRecording, extensionFor, canvasVideoTrack } from './recorder.js';
 import { concatenate } from './composer.js';
@@ -28,6 +28,7 @@ const els = {
   grid: $('#btn-grid'),
   torch: $('#btn-torch'),
   switchCam: $('#btn-switch'),
+  snap: $('#btn-snap'),
   libraryButton: $('#btn-library'),
   recTimer: $('#rec-timer'),
   toast: $('#toast'),
@@ -216,7 +217,11 @@ function setRecordingUI(on) {
   els.shutter.classList.toggle('recording', on);
   const lock = [els.switchCam, els.libraryButton, els.filter, ...document.querySelectorAll('.modes button')];
   lock.forEach((b) => { b.disabled = on; });
-  els.recTimer.classList.toggle('hidden', !(on && state.mode === 'video'));
+  const videoRecording = on && state.mode === 'video';
+  els.recTimer.classList.toggle('hidden', !videoRecording);
+  // VIDEO 録画中は、カメラ切り替えの位置に写真ボタンを出す
+  els.switchCam.classList.toggle('hidden', videoRecording);
+  els.snap.classList.toggle('hidden', !videoRecording);
 }
 
 /** VLOG：1タップで2秒録画 → 自動停止 → アプリ内に保存 */
@@ -278,7 +283,9 @@ async function toggleVideo() {
         thumb: v.thumb,
       }));
       for (const item of items) await store.putMedia(item);
-      offerSave(items, '9:16 と 16:9 を撮影しました');
+      // 録画中に撮った写真も一緒に保存できるようにする
+      const photos = rec.snaps.length / 2;
+      offerSave([...items, ...rec.snaps], photos ? `動画と写真${photos}回分を撮影しました` : '9:16 と 16:9 を撮影しました');
     } catch (e) {
       console.error(e);
       toast('録画に失敗しました');
@@ -299,6 +306,7 @@ async function toggleVideo() {
     wide: startRecording(els.canvasWide, audio2, 5_000_000),
     thumbMain: thumbnailFrom(els.canvasMain),
     thumbWide: thumbnailFrom(els.canvasWide),
+    snaps: [], // 録画中に撮った写真
   };
   setRecordingUI(true);
   if (state.torch) setTorch(true);
@@ -319,7 +327,36 @@ async function takePhoto() {
     thumb: thumbnailFrom(canvas),
   }));
   state.recording = null;
+  await savePhotos(shots, now);
+}
 
+/**
+ * VIDEO 録画中に写真を撮る。動画は止めずに、今のフレーム（9:16 / 16:9）を写真にする。
+ * 動画には時刻を入れないので、写真の時刻 ON の時だけ写真側に時刻を描き足す。
+ */
+async function snapDuringVideo() {
+  if (!state.recording || state.recording.kind !== 'video') return;
+  const now = Date.now();
+  const text = state.photoTime ? store.hourLabel(now) : null;
+  const shots = [
+    { canvas: els.canvasMain, ratio: '9x16' },
+    { canvas: els.canvasWide, ratio: '16x9' },
+  ].map(({ canvas, ratio }) => {
+    const copy = document.createElement('canvas');
+    copy.width = canvas.width;
+    copy.height = canvas.height;
+    const ctx = copy.getContext('2d');
+    ctx.drawImage(canvas, 0, 0);
+    if (text) drawTimeText(ctx, copy.width, copy.height, text);
+    return { ratio, dataURL: copy.toDataURL('image/jpeg', 0.92), thumb: thumbnailFrom(copy) };
+  });
+  const rec = state.recording;
+  const items = await savePhotos(shots, now);
+  rec.snaps.push(...items);
+  toast('写真を撮りました');
+}
+
+async function savePhotos(shots, now) {
   document.querySelectorAll('.preview .blink').forEach((b) => {
     b.classList.remove('on');
     void b.offsetWidth;
@@ -337,7 +374,9 @@ async function takePhoto() {
     thumb: shot.thumb,
   }));
   for (const item of items) await store.putMedia(item);
-  offerSave(items, '9:16 と 16:9 を撮影しました');
+  // 録画中は保存バーを出さない（あとで素材一覧の VIDEO・PHOTO から保存できる）
+  if (state.mode === 'photo') offerSave(items, '9:16 と 16:9 を撮影しました');
+  return items;
 }
 
 function fileStamp(time) {
@@ -387,6 +426,8 @@ function setZoom(z) {
   const r = Math.round(state.zoom * 10) / 10;
   els.zoom.textContent = `${Number.isInteger(r) ? r : r.toFixed(1)}x`;
 }
+
+els.snap.addEventListener('click', snapDuringVideo);
 
 els.shutter.addEventListener('click', () => {
   if (state.mode === 'vlog') recordVlogClip();
