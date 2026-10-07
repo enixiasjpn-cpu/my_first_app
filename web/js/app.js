@@ -7,6 +7,7 @@ import { toast, shareToPhotos } from './ui.js';
 
 const CLIP_DURATION_MS = 2000;
 const SIZES = {
+  vlog: [1920, 1080], // VLOG は横 16:9
   portrait: [1080, 1920],
   wide: [1280, 720], // 縦の映像の中央を横長に切り抜くため、この解像度で十分
 };
@@ -111,6 +112,7 @@ function outputSizeForMain() {
     const vh = els.camera.videoHeight || 1920;
     return vw > vh ? [1440, 1080] : [1080, 1440];
   }
+  if (state.mode === 'vlog') return SIZES.vlog;
   return SIZES.portrait;
 }
 
@@ -169,11 +171,21 @@ function layout() {
   };
 
   if (state.mode === 'video') {
-    const [ww, wh] = fit(16 / 9, sw, sh * 0.45);
-    const [mw, mh] = fit(9 / 16, sw, sh - wh - 8);
+    const landscape = sw > sh;
+    els.stage.style.flexDirection = landscape ? 'row' : 'column';
+    let ww, wh, mw, mh;
+    if (landscape) {
+      // 横持ち：9:16 と 16:9 を左右に並べる
+      [ww, wh] = fit(16 / 9, sw * 0.68, sh);
+      [mw, mh] = fit(9 / 16, sw - ww - 8, sh);
+    } else {
+      [ww, wh] = fit(16 / 9, sw, sh * 0.45);
+      [mw, mh] = fit(9 / 16, sw, sh - wh - 8);
+    }
     Object.assign(els.previewWide.style, { width: `${ww}px`, height: `${wh}px` });
     Object.assign(els.previewMain.style, { width: `${mw}px`, height: `${mh}px` });
   } else {
+    els.stage.style.flexDirection = 'column';
     const aspect = els.canvasMain.width / els.canvasMain.height;
     const [mw, mh] = fit(aspect, sw, sh);
     Object.assign(els.previewMain.style, { width: `${mw}px`, height: `${mh}px` });

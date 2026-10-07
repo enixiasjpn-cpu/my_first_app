@@ -80,7 +80,17 @@ export async function concatenate(blobs, { width, height, onProgress }) {
   let active = null;
   let running = true;
   const draw = () => {
-    if (active && active.readyState >= 2) ctx.drawImage(active, 0, 0, width, height);
+    if (active && active.readyState >= 2) {
+      // 比率が違うクリップ（以前の縦動画など）は黒帯を付けて収める
+      const vw = active.videoWidth || width;
+      const vh = active.videoHeight || height;
+      const scale = Math.min(width / vw, height / vh);
+      const dw = vw * scale;
+      const dh = vh * scale;
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(active, (width - dw) / 2, (height - dh) / 2, dw, dh);
+    }
     if (running) requestAnimationFrame(draw);
   };
 

@@ -157,8 +157,8 @@ async function onSaveDay() {
   els.saveDay.textContent = `つないでいます… 0/${list.length}`;
   try {
     const blob = await concatenate(list.map((c) => c.blob), {
-      width: 1080,
-      height: 1920,
+      width: 1920,
+      height: 1080,
       onProgress: (done, total) => {
         els.saveDay.textContent = `つないでいます… ${done}/${total}`;
       },

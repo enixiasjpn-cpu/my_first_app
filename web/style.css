@@ -362,6 +362,9 @@ button:disabled { opacity: 0.35; }
   background: rgba(0, 0, 0, 0.55);
 }
 
+.wide-cells { grid-template-columns: repeat(2, 1fr); }
+.wide-cells .cell { aspect-ratio: 16 / 9; }
+
 .empty { text-align: center; color: var(--muted); margin: 60px 16px; line-height: 1.8; }
 
 .bottom-action { padding: 12px 20px 16px; flex: none; }
@@ -379,4 +382,38 @@ button:disabled { opacity: 0.35; }
   max-height: 100%;
   border-radius: 12px;
   background: #000;
+}
+
+/* ---- iPhone を横に持ったとき：上部ボタンを左、操作ボタンを右に縦並び ---- */
+@media (orientation: landscape) and (max-height: 600px) {
+  #app {
+    flex-direction: row;
+    padding: 0 env(safe-area-inset-right) 0 env(safe-area-inset-left);
+  }
+  .topbar {
+    flex-direction: column;
+    height: auto;
+    width: 64px;
+    padding: 12px 8px;
+  }
+  #stage { padding: 8px 0; }
+  .controls {
+    flex-direction: row;
+    padding: 8px 12px;
+    gap: 14px;
+  }
+  .modes { flex-direction: column; gap: 18px; }
+  .row {
+    width: auto;
+    height: 100%;
+    grid-template-columns: none;
+    grid-template-rows: 1fr auto 1fr;
+    justify-items: center;
+    padding: 12px 0;
+  }
+  .row > :first-child { justify-self: center; align-self: end; }
+  .row > :last-child { justify-self: center; align-self: start; }
+  .save-bar { bottom: 12px; left: 80px; right: 220px; }
+  .grid-list { grid-template-columns: repeat(4, 1fr); }
+  .wide-cells { grid-template-columns: repeat(3, 1fr); }
 }
