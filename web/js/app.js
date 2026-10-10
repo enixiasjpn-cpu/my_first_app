@@ -6,7 +6,7 @@ import * as store from './store.js';
 import { toast, shareToPhotos } from './ui.js';
 
 // アプリのバージョン（更新したら上げる）
-const APP_VERSION = '1.8';
+const APP_VERSION = '1.9';
 
 const CLIP_DURATION_MS = 2000;
 const SIZES = {
@@ -88,14 +88,28 @@ async function startCamera() {
   state.torch = false;
   els.torch.classList.remove('active');
 
-  if (!state.audioTrack) {
-    try {
-      const mic = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-      state.audioTrack = mic.getAudioTracks()[0] || null;
-    } catch (_) {
-      state.audioTrack = null; // マイクなしでも撮影はできる
-    }
+}
+
+/**
+ * マイクは録画するときに初めて使う（起動しただけではマイクを使わない）。
+ * iPhone はマイクを使い始めると音やオレンジの点で知らせるため。
+ */
+let micPromise = null;
+function ensureMic() {
+  if (state.audioTrack && state.audioTrack.readyState === 'live') return Promise.resolve(state.audioTrack);
+  if (!micPromise) {
+    micPromise = navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+      .then((mic) => (state.audioTrack = mic.getAudioTracks()[0] || null))
+      .catch(() => (state.audioTrack = null)) // マイクなしでも撮影はできる
+      .finally(() => { micPromise = null; });
   }
+  return micPromise;
+}
+
+/** アプリを閉じた・切り替えたらマイクを止める */
+function releaseMic() {
+  if (state.audioTrack) state.audioTrack.stop();
+  state.audioTrack = null;
 }
 
 async function setTorch(on) {
@@ -239,6 +253,7 @@ async function recordVlogClip() {
 
   let thumb = null;
   try {
+    await ensureMic();
     const rec = startRecording(els.canvasMain, state.audioTrack, 8_000_000);
     const thumbTimer = setTimeout(() => { thumb = thumbnailFrom(els.canvasMain); }, CLIP_DURATION_MS / 2);
     await new Promise((r) => setTimeout(r, CLIP_DURATION_MS));
@@ -263,6 +278,8 @@ async function recordVlogClip() {
     setRecordingUI(false);
   }
 }
+
+let videoStarting = false;
 
 /** VIDEO：9:16 と 16:9 を同時に録画 */
 async function toggleVideo() {
@@ -295,8 +312,14 @@ async function toggleVideo() {
     }
     return;
   }
-  if (state.recording) return;
+  if (state.recording || videoStarting) return;
 
+  videoStarting = true;
+  try {
+    await ensureMic();
+  } finally {
+    videoStarting = false;
+  }
   const startedAt = Date.now();
   renderFrame();
   const audio2 = state.audioTrack ? state.audioTrack.clone() : null;
@@ -488,6 +511,10 @@ els.stage.addEventListener('touchmove', (e) => {
 els.stage.addEventListener('touchend', () => { pinch = null; });
 
 $('#btn-retry').addEventListener('click', startCamera);
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && !state.recording) releaseMic();
+});
 
 // iOS は一度タップしないと映像が止まったままのことがある
 document.addEventListener('click', () => {

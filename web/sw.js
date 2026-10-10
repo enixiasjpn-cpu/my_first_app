@@ -1,5 +1,5 @@
 // オフラインでも起動できるようにアプリ本体をキャッシュする（更新はネット優先）
-const CACHE = 'vlogcam-v8';
+const CACHE = 'vlogcam-v9';
 const ASSETS = [
   './',
   './index.html',
