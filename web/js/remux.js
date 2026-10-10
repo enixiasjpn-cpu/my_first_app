@@ -35,6 +35,35 @@ function sameBytes(a, b) {
   return true;
 }
 
+/**
+ * iPhone の Safari が録画した MP4 は細かいブロック（フラグメント）に分かれていて、
+ * 各ブロックの開始時刻（tfdt）が正しい時刻になっている。mp4box.js は2つ目以降のブロックの
+ * 開始時刻を使わず、前のコマの長さを足していくだけなので、コマが前に詰まってしまう
+ * （つないだ動画の後半が止まって見える原因）。ここで各ブロックの開始時刻に合わせ直す。
+ */
+function fixFragmentTimes(file, trackId) {
+  const trak = file.getTrackById(trackId);
+  const moofs = file.moofs || [];
+  if (!trak || !moofs.length) return;
+  let currentMoof = -1;
+  let base = 0;
+  let acc = 0;
+  for (const sample of trak.samples) {
+    if (sample.moof_number === undefined) continue; // フラグメントでない部分はそのまま
+    if (sample.moof_number !== currentMoof) {
+      currentMoof = sample.moof_number;
+      const moof = moofs[sample.moof_number - 1];
+      const traf = moof && moof.trafs && moof.trafs.find((t) => t.tfhd && t.tfhd.track_id === trackId);
+      base = traf && traf.tfdt ? traf.tfdt.baseMediaDecodeTime : sample.dts;
+      acc = 0;
+    }
+    const compositionOffset = sample.cts - sample.dts;
+    sample.dts = base + acc;
+    sample.cts = sample.dts + compositionOffset;
+    acc += sample.duration;
+  }
+}
+
 /** 1本の MP4 から、映像・音声のサンプル（圧縮されたままのデータ）と設定を取り出す */
 async function demux(MP4Box, blob) {
   const buffer = await blob.arrayBuffer();
@@ -45,12 +74,6 @@ async function demux(MP4Box, blob) {
     file.onError = (e) => reject(new Error(String(e)));
     file.onReady = (i) => {
       info = i;
-      for (const track of [i.videoTracks[0], i.audioTracks[0]]) {
-        if (!track) continue;
-        samples[track.id] = [];
-        file.setExtractionOptions(track.id, null, { nbSamples: Infinity });
-      }
-      file.start();
     };
     file.onSamples = (id, _user, list) => {
       samples[id].push(...list);
@@ -63,6 +86,14 @@ async function demux(MP4Box, blob) {
       reject(new Error('not an mp4'));
       return;
     }
+    // 全体を読み込み終えてから時刻を直し、サンプルを取り出す
+    for (const track of [info.videoTracks[0], info.audioTracks[0]]) {
+      if (!track) continue;
+      fixFragmentTimes(file, track.id);
+      samples[track.id] = [];
+      file.setExtractionOptions(track.id, null, { nbSamples: Infinity });
+    }
+    file.start();
     const v = info.videoTracks[0];
     if (!v) {
       reject(new Error('no video track'));
@@ -222,9 +253,14 @@ export async function remuxConcat(blobs) {
     const startCts = Math.min(...vs.map((s) => s.cts));
     let clipEnd = 0;
 
+    // 1コマの標準的な間隔（中央値）。最後のコマの長さが短く記録されていても、これだけは表示する
+    const sortedCts = vs.map((s) => s.cts).sort((a, b) => a - b);
+    const gaps = sortedCts.slice(1).map((c, i) => c - sortedCts[i]).filter((g) => g > 0).sort((a, b) => a - b);
+    const typicalFrame = gaps.length ? (gaps[Math.floor(gaps.length / 2)] / scale) * US : 0;
+
     for (const s of vs) {
       const t = offset + ((s.cts - startCts) / scale) * US;
-      const dur = (s.duration / scale) * US;
+      const dur = Math.max((s.duration / scale) * US, s === vs[vs.length - 1] ? typicalFrame : 0);
       const cto = ((s.cts - s.dts) - (startCts - startDts)) / scale * US;
       muxer.addVideoChunkRaw(s.data, s.is_sync ? 'key' : 'delta', t, dur, firstVideo ? videoMeta : undefined, cto);
       firstVideo = false;
