@@ -67,20 +67,66 @@ function makeTexture(gl) {
 }
 
 /**
- * 時刻文字（白・セミボールド・ごく薄い影）を描く。動画・写真で共通。
+ * 時刻表示の見た目。ここの値を変えるだけで、プレビュー・動画・写真すべてに反映される。
+ * デザイン：02「レトロ・丸み（やや細め）」
+ *   フォント Quicksand Medium（web/fonts/ に同梱。OFL ライセンス）
+ *   白 #FFFFFF・不透明度 85%・影なし・縁取りなし
+ */
+export const TIME_STYLE = {
+  fontFamily: '"VlogCam Time", ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", sans-serif',
+  fontWeight: 500,
+  sizeRatio: 0.17, // 文字の高さ = 画像の短い辺 × この値
+  opacity: 0.85,
+  letterSpacing: 0.04, // 字間（文字サイズに対する割合）
+  bottomMargin: 0.95, // 位置「下」のとき、下端から文字中心までの距離（文字サイズに対する割合）
+};
+
+let timeFontReady = null;
+
+/** 時刻用フォントを読み込む（読み込めない環境では丸ゴシック系のシステムフォントで表示） */
+export function loadTimeFont() {
+  if (!timeFontReady) {
+    timeFontReady = (async () => {
+      try {
+        const face = new FontFace('VlogCam Time', `url(${new URL('../fonts/quicksand-500.woff2', import.meta.url).href})`, {
+          weight: String(TIME_STYLE.fontWeight),
+        });
+        await face.load();
+        document.fonts.add(face);
+        return true;
+      } catch (_) {
+        return false;
+      }
+    })();
+  }
+  return timeFontReady;
+}
+
+/**
+ * 時刻文字を描く。動画・写真で共通。
  * position: 'center'（真ん中・既定） / 'bottom'（下）
  */
 export function drawTimeText(ctx, w, h, text, position = 'center') {
   ctx.save();
-  const fontSize = Math.round(Math.min(w, h) * 0.2);
-  ctx.font = `600 ${fontSize}px -apple-system, "SF Pro Display", "Helvetica Neue", "Hiragino Sans", Arial, sans-serif`;
-  ctx.textAlign = 'center';
+  const fontSize = Math.round(Math.min(w, h) * TIME_STYLE.sizeRatio);
+  ctx.font = `${TIME_STYLE.fontWeight} ${fontSize}px ${TIME_STYLE.fontFamily}`;
+  ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#ffffff';
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.25)';
-  ctx.shadowBlur = fontSize * 0.08;
-  const y = position === 'bottom' ? h - fontSize * 0.95 : h / 2;
-  ctx.fillText(text, w / 2, y);
+  ctx.fillStyle = `rgba(255, 255, 255, ${TIME_STYLE.opacity})`;
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+
+  // 字間を少し空けて1文字ずつ描く（数字を詰めすぎない）
+  const chars = [...text];
+  const widths = chars.map((c) => ctx.measureText(c).width);
+  const tracking = fontSize * TIME_STYLE.letterSpacing;
+  const total = widths.reduce((a, b) => a + b, 0) + tracking * (chars.length - 1);
+  const y = position === 'bottom' ? h - fontSize * TIME_STYLE.bottomMargin : h / 2;
+  let x = (w - total) / 2;
+  chars.forEach((c, i) => {
+    ctx.fillText(c, Math.round(x), Math.round(y));
+    x += widths[i] + tracking;
+  });
   ctx.restore();
 }
 
@@ -127,6 +173,11 @@ export class FrameRenderer {
     this.textCanvas = document.createElement('canvas');
     this.currentText = null;
     this.currentTextSize = '';
+  }
+
+  /** フォントの読み込みが終わった時などに、時刻文字の画像を作り直させる */
+  invalidateText() {
+    this.currentText = null;
   }
 
   setSize(width, height) {

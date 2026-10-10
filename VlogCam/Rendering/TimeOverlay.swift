@@ -41,22 +41,26 @@ final class TimeOverlayRenderer: @unchecked Sendable {
         return rendered
     }
 
-    /// 白文字・セミボールド・ごく薄い影。キャンバスの中央に配置した CIImage を返す。
+    /// 時刻表示の見た目（Web 版の TIME_STYLE と同じ値）。
+    /// デザイン：02「レトロ・丸み（やや細め）」— 丸ゴシック・Medium・白 85%・影なし・縁取りなし
+    enum Style {
+        static let sizeRatio: CGFloat = 0.17
+        static let opacity: CGFloat = 0.85
+        static let letterSpacing: CGFloat = 0.04
+    }
+
+    /// 時刻文字をキャンバスの中央に配置した CIImage を返す。
     private static func renderText(_ text: String, canvasSize: CGSize) -> CIImage {
         let shortSide = min(canvasSize.width, canvasSize.height)
-        let fontSize = (shortSide * 0.2).rounded()
+        let fontSize = (shortSide * Style.sizeRatio).rounded()
 
-        let font = UIFont.monospacedDigitSystemFont(ofSize: fontSize, weight: .semibold)
-
-        let shadow = NSShadow()
-        shadow.shadowColor = UIColor.black.withAlphaComponent(0.25)
-        shadow.shadowBlurRadius = fontSize * 0.08
-        shadow.shadowOffset = .zero
+        let base = UIFont.systemFont(ofSize: fontSize, weight: .medium)
+        let font = base.fontDescriptor.withDesign(.rounded).map { UIFont(descriptor: $0, size: fontSize) } ?? base
 
         let attributed = NSAttributedString(string: text, attributes: [
             .font: font,
-            .foregroundColor: UIColor.white,
-            .shadow: shadow,
+            .foregroundColor: UIColor.white.withAlphaComponent(Style.opacity),
+            .kern: fontSize * Style.letterSpacing,
         ])
 
         let textSize = attributed.size()

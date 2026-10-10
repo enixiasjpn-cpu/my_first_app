@@ -1,4 +1,4 @@
-import { FrameRenderer } from './renderer.js';
+import { FrameRenderer, loadTimeFont } from './renderer.js';
 import { FILTERS } from './filters.js';
 import { startRecording, extensionFor, canvasVideoTrack } from './recorder.js';
 import { concatenate } from './composer.js';
@@ -6,7 +6,7 @@ import * as store from './store.js';
 import { toast, shareToPhotos } from './ui.js';
 
 // アプリのバージョン（更新したら上げる）
-const APP_VERSION = '2.3';
+const APP_VERSION = '2.4';
 
 const CLIP_DURATION_MS = 2000;
 const SIZES = {
@@ -616,6 +616,11 @@ async function updateApp() {
 
 async function init() {
   $('#btn-update').addEventListener('click', updateApp);
+  // 時刻用フォントを読み込み、読み込めたら時刻を描き直す（撮影開始は待たせない）
+  loadTimeFont().then(() => {
+    mainRenderer.invalidateText();
+    wideRenderer.invalidateText();
+  });
   try {
     if (sessionStorage.getItem('vlogcam-updated')) {
       sessionStorage.removeItem('vlogcam-updated');
