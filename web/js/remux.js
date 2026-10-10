@@ -36,32 +36,134 @@ function sameBytes(a, b) {
 }
 
 /**
- * iPhone の Safari が録画した MP4 は細かいブロック（フラグメント）に分かれていて、
- * 各ブロックの開始時刻（tfdt）が正しい時刻になっている。mp4box.js は2つ目以降のブロックの
- * 開始時刻を使わず、前のコマの長さを足していくだけなので、コマが前に詰まってしまう
- * （つないだ動画の後半が止まって見える原因）。ここで各ブロックの開始時刻に合わせ直す。
+ * iPhone の Safari が録画した MP4 は細かいブロック（フラグメント: moof + mdat）に分かれている。
+ * mp4box.js はこの形式で、2つ目以降のブロックのコマのデータ位置と時刻を正しく読めない
+ * （つないだ動画でコマが壊れて止まって見える原因）。
+ * そこでフラグメント部分は仕様（ISO/IEC 14496-12）どおりに自前で読む。
+ * @returns {Map<number, object[]>|null} トラックID → サンプル一覧。フラグメントがなければ null。
  */
-function fixFragmentTimes(file, trackId) {
-  const trak = file.getTrackById(trackId);
-  const moofs = file.moofs || [];
-  if (!trak || !moofs.length) return;
-  let currentMoof = -1;
-  let base = 0;
-  let acc = 0;
-  for (const sample of trak.samples) {
-    if (sample.moof_number === undefined) continue; // フラグメントでない部分はそのまま
-    if (sample.moof_number !== currentMoof) {
-      currentMoof = sample.moof_number;
-      const moof = moofs[sample.moof_number - 1];
-      const traf = moof && moof.trafs && moof.trafs.find((t) => t.tfhd && t.tfhd.track_id === trackId);
-      base = traf && traf.tfdt ? traf.tfdt.baseMediaDecodeTime : sample.dts;
-      acc = 0;
+function parseFragments(buffer, timescales) {
+  const view = new DataView(buffer);
+  const u8 = new Uint8Array(buffer);
+  const len = buffer.byteLength;
+  const u32 = (p) => view.getUint32(p);
+  const u64 = (p) => Number(view.getBigUint64(p));
+  const type = (p) => String.fromCharCode(u8[p], u8[p + 1], u8[p + 2], u8[p + 3]);
+
+  function* children(start, end) {
+    let p = start;
+    while (p + 8 <= end) {
+      let size = u32(p);
+      let header = 8;
+      if (size === 1) {
+        size = u64(p + 8);
+        header = 16;
+      } else if (size === 0) {
+        size = end - p;
+      }
+      if (size < header || p + size > end) break;
+      yield { type: type(p + 4), start: p, body: p + header, end: p + size };
+      p += size;
     }
-    const compositionOffset = sample.cts - sample.dts;
-    sample.dts = base + acc;
-    sample.cts = sample.dts + compositionOffset;
-    acc += sample.duration;
   }
+
+  // trex（既定値）
+  const trex = new Map();
+  const moofs = [];
+  for (const box of children(0, len)) {
+    if (box.type === 'moov') {
+      for (const m of children(box.body, box.end)) {
+        if (m.type !== 'mvex') continue;
+        for (const t of children(m.body, m.end)) {
+          if (t.type !== 'trex') continue;
+          const b = t.body + 4;
+          trex.set(u32(b), { sdi: u32(b + 4), duration: u32(b + 8), size: u32(b + 12), flags: u32(b + 16) });
+        }
+      }
+    } else if (box.type === 'moof') {
+      moofs.push(box);
+    }
+  }
+  if (!moofs.length) return null;
+
+  const result = new Map();
+  const nextDts = new Map();
+  for (const moof of moofs) {
+    let previousTrafEnd = null;
+    let trafIndex = 0;
+    for (const traf of children(moof.body, moof.end)) {
+      if (traf.type !== 'traf') continue;
+      let trackId = 0;
+      let base = moof.start;
+      let def = { duration: 0, size: 0, flags: 0 };
+      let tfdt = null;
+      const truns = [];
+      for (const box of children(traf.body, traf.end)) {
+        if (box.type === 'tfhd') {
+          const flags = u32(box.body) & 0xffffff;
+          trackId = u32(box.body + 4);
+          const ex = trex.get(trackId) || { duration: 0, size: 0, flags: 0 };
+          def = { duration: ex.duration, size: ex.size, flags: ex.flags };
+          let p = box.body + 8;
+          let explicitBase = null;
+          if (flags & 0x1) { explicitBase = u64(p); p += 8; }
+          if (flags & 0x2) p += 4;
+          if (flags & 0x8) { def.duration = u32(p); p += 4; }
+          if (flags & 0x10) { def.size = u32(p); p += 4; }
+          if (flags & 0x20) { def.flags = u32(p); p += 4; }
+          if (explicitBase !== null) base = explicitBase;
+          else if (flags & 0x20000) base = moof.start; // default-base-is-moof
+          else base = trafIndex === 0 || previousTrafEnd === null ? moof.start : previousTrafEnd;
+        } else if (box.type === 'tfdt') {
+          const version = u8[box.body];
+          tfdt = version === 1 ? u64(box.body + 4) : u32(box.body + 4);
+        } else if (box.type === 'trun') {
+          truns.push(box);
+        }
+      }
+      trafIndex++;
+      if (!trackId || !timescales[trackId]) {
+        continue;
+      }
+      const list = result.get(trackId) || [];
+      result.set(trackId, list);
+      let dts = tfdt !== null ? tfdt : (nextDts.get(trackId) || 0);
+      let dataPos = base;
+      for (const trun of truns) {
+        const version = u8[trun.body];
+        const flags = u32(trun.body) & 0xffffff;
+        const count = u32(trun.body + 4);
+        let p = trun.body + 8;
+        if (flags & 0x1) { dataPos = base + view.getInt32(p); p += 4; }
+        let firstFlags = null;
+        if (flags & 0x4) { firstFlags = u32(p); p += 4; }
+        for (let k = 0; k < count; k++) {
+          let duration = def.duration;
+          let size = def.size;
+          let sampleFlags = k === 0 && firstFlags !== null ? firstFlags : def.flags;
+          let cto = 0;
+          if (flags & 0x100) { duration = u32(p); p += 4; }
+          if (flags & 0x200) { size = u32(p); p += 4; }
+          if (flags & 0x400) { sampleFlags = u32(p); p += 4; }
+          if (flags & 0x800) { cto = version === 0 ? u32(p) : view.getInt32(p); p += 4; }
+          if (dataPos + size > len) throw new Error('sample outside file');
+          list.push({
+            data: u8.subarray(dataPos, dataPos + size),
+            dts,
+            cts: dts + cto,
+            duration,
+            timescale: timescales[trackId],
+            is_sync: ((sampleFlags >> 16) & 0x1) === 0,
+          });
+          dataPos += size;
+          dts += duration;
+        }
+      }
+      nextDts.set(trackId, dts);
+      previousTrafEnd = dataPos;
+    }
+  }
+  return result;
 }
 
 /** 1本の MP4 から、映像・音声のサンプル（圧縮されたままのデータ）と設定を取り出す */
@@ -86,14 +188,28 @@ async function demux(MP4Box, blob) {
       reject(new Error('not an mp4'));
       return;
     }
-    // 全体を読み込み終えてから時刻を直し、サンプルを取り出す
+    // moov 内のサンプルは mp4box.js で、フラグメント部分は自前で読む
+    const timescales = {};
     for (const track of [info.videoTracks[0], info.audioTracks[0]]) {
       if (!track) continue;
-      fixFragmentTimes(file, track.id);
+      timescales[track.id] = track.timescale;
       samples[track.id] = [];
       file.setExtractionOptions(track.id, null, { nbSamples: Infinity });
     }
     file.start();
+    let fragments = null;
+    try {
+      fragments = parseFragments(buffer, timescales);
+    } catch (e) {
+      reject(e);
+      return;
+    }
+    if (fragments) {
+      for (const id of Object.keys(samples)) {
+        const fromMoov = samples[id].filter((smp) => smp.moof_number === undefined);
+        samples[id] = fromMoov.concat(fragments.get(Number(id)) || []);
+      }
+    }
     const v = info.videoTracks[0];
     if (!v) {
       reject(new Error('no video track'));
