@@ -430,3 +430,24 @@ button:disabled { opacity: 0.35; }
   .grid-list { grid-template-columns: repeat(4, 1fr); }
   .wide-cells { grid-template-columns: repeat(3, 1fr); }
 }
+
+/* ---- 詳細情報（不具合調査用） ---- */
+.info-link { display: block; margin: 10px auto 0; font-size: 13px; color: var(--muted); text-decoration: underline; }
+.info-panel {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: calc(env(safe-area-inset-top) + 60px);
+  max-height: 60%;
+  overflow: auto;
+  margin: 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.88);
+  color: #fff;
+  font: 12px/1.5 ui-monospace, Menlo, monospace;
+  white-space: pre-wrap;
+  z-index: 5;
+  -webkit-user-select: text;
+  user-select: text;
+}

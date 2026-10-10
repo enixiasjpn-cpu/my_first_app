@@ -107,6 +107,54 @@ async function demux(MP4Box, blob) {
   });
 }
 
+/** 不具合調査用：1本のクリップの中身（タイミング情報）を文字にまとめる */
+export async function describeClip(blob) {
+  const lines = [`形式: ${blob.type}`, `サイズ: ${(blob.size / 1024).toFixed(0)} KB`];
+  if (!/mp4/.test(blob.type)) return lines.join('\n');
+  const MP4Box = await loadMP4Box();
+  const clip = await demux(MP4Box, blob);
+  const fmt = (n) => (Math.round(n * 1000) / 1000).toString();
+  const v = clip.video;
+  const vs = v.samples;
+  if (vs.length) {
+    const ts = vs[0].timescale;
+    const durs = vs.map((s) => s.duration);
+    const ctsList = vs.map((s) => s.cts);
+    const minCts = Math.min(...ctsList);
+    const maxCts = Math.max(...ctsList);
+    let reorder = 0;
+    let nonMono = 0;
+    for (let i = 1; i < vs.length; i++) {
+      if (vs[i].cts !== vs[i].dts) reorder++;
+      if (vs[i].dts < vs[i - 1].dts) nonMono++;
+    }
+    lines.push(
+      `映像: ${v.codec} ${v.width}x${v.height}`,
+      `  コマ数 ${vs.length} / キー ${vs.filter((s) => s.is_sync).length} / timescale ${ts}`,
+      `  最初 cts ${vs[0].cts} dts ${vs[0].dts}`,
+      `  cts範囲 ${fmt((maxCts - minCts) / ts)}秒 / 長さ合計 ${fmt(durs.reduce((a, b) => a + b, 0) / ts)}秒`,
+      `  1コマ 最小 ${fmt(Math.min(...durs) / ts)} 最大 ${fmt(Math.max(...durs) / ts)}秒 / 最後 ${fmt(durs[durs.length - 1] / ts)}秒`,
+      `  並べ替え ${reorder} / dts逆行 ${nonMono}`,
+      `  先頭5: ${vs.slice(0, 5).map((s) => `${s.cts}/${s.dts}/${s.duration}`).join(' ')}`,
+      `  末尾3: ${vs.slice(-3).map((s) => `${s.cts}/${s.dts}/${s.duration}`).join(' ')}`,
+    );
+  } else {
+    lines.push('映像: サンプルなし');
+  }
+  if (clip.audio) {
+    const as = clip.audio.samples;
+    const ats = as.length ? as[0].timescale : 1;
+    lines.push(
+      `音声: ${clip.audio.codec} ${clip.audio.sampleRate}Hz ${clip.audio.channels}ch`,
+      `  フレーム ${as.length} / 最初 cts ${as.length ? as[0].cts : '-'} / 長さ ${fmt(as.reduce((a, s) => a + s.duration, 0) / ats)}秒`,
+    );
+  } else {
+    lines.push('音声: なし');
+  }
+  lines.push(`avcC: ${Array.from(v.description.slice(0, 24)).map((b) => b.toString(16).padStart(2, '0')).join('')}`);
+  return lines.join('\n');
+}
+
 /**
  * @param {Blob[]} blobs 撮影順のクリップ
  * @returns {Promise<Blob|null>} つないだ MP4。この方式でつなげない場合は null。

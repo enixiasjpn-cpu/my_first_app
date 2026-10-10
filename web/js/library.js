@@ -4,6 +4,7 @@ import * as store from './store.js';
 import { concatenate } from './composer.js';
 import { extensionFor } from './recorder.js';
 import { toast, shareToPhotos } from './ui.js';
+import { describeClip } from './remux.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -48,6 +49,8 @@ export function initLibrary({ onClose }) {
 
   els.saveDay.addEventListener('click', onSaveDay);
   els.saveOne.addEventListener('click', onSaveOne);
+  $('#btn-info').addEventListener('click', onInfo);
+  $('#info-panel').addEventListener('click', () => $('#info-panel').classList.add('hidden'));
   els.deleteButton.addEventListener('click', onDelete);
 }
 
@@ -220,7 +223,24 @@ function openViewer(target) {
   els.viewer.classList.remove('hidden');
 }
 
+async function onInfo() {
+  if (!viewing) return;
+  const panel = $('#info-panel');
+  const { type, item } = viewing;
+  panel.textContent = '調べています…';
+  panel.classList.remove('hidden');
+  const head = type === 'clip' ? `VLOG ${store.hourLabel(item.recordedAt)} ${item.filter || ''}` : item.name;
+  const video = els.viewerVideo;
+  const playerDuration = video && Number.isFinite(video.duration) ? `再生上の長さ: ${video.duration.toFixed(3)}秒` : '';
+  try {
+    panel.textContent = [head, playerDuration, await describeClip(item.blob), '', '（タップで閉じる）'].join('\n');
+  } catch (e) {
+    panel.textContent = `${head}\n調べられませんでした: ${e && e.message}`;
+  }
+}
+
 function closeViewer() {
+  $('#info-panel').classList.add('hidden');
   els.viewerVideo.pause();
   els.viewerVideo.removeAttribute('src');
   els.viewerVideo.load();
