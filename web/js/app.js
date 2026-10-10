@@ -6,7 +6,7 @@ import * as store from './store.js';
 import { toast, shareToPhotos } from './ui.js';
 
 // アプリのバージョン（更新したら上げる）
-const APP_VERSION = '1.6';
+const APP_VERSION = '1.7';
 
 const CLIP_DURATION_MS = 2000;
 const SIZES = {

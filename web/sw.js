@@ -1,5 +1,5 @@
 // オフラインでも起動できるようにアプリ本体をキャッシュする（更新はネット優先）
-const CACHE = 'vlogcam-v6';
+const CACHE = 'vlogcam-v7';
 const ASSETS = [
   './',
   './index.html',
@@ -13,6 +13,9 @@ const ASSETS = [
   './js/recorder.js',
   './js/composer.js',
   './js/library.js',
+  './js/remux.js',
+  './vendor/mp4box.all.min.js',
+  './vendor/mp4-muxer.mjs',
   './icons/apple-touch-icon.png',
   './icons/icon-192.png',
   './icons/icon-512.png',

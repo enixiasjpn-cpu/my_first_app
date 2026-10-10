@@ -4,6 +4,7 @@
 // （合計の長さぶん時間がかかる）。
 
 import { startRecording } from './recorder.js';
+import { remuxConcat } from './remux.js';
 
 function makeVideo(host) {
   const v = document.createElement('video');
@@ -42,6 +43,22 @@ function load(video, url) {
  */
 export async function concatenate(blobs, { width, height, onProgress }) {
   if (!blobs.length) throw new Error('保存できる動画がありません');
+
+  // まずは再生せずにそのままつなぐ（速い・画質劣化なし・RETRO など重い動画でも縮まない）
+  try {
+    const joined = await remuxConcat(blobs);
+    if (joined) {
+      if (onProgress) onProgress(blobs.length, blobs.length);
+      return joined;
+    }
+  } catch (e) {
+    console.warn('remux failed, falling back to re-recording', e);
+  }
+  return reRecord(blobs, { width, height, onProgress });
+}
+
+/** 予備の方式：クリップを順に再生しながら録画し直す（合計の長さぶん時間がかかる） */
+async function reRecord(blobs, { width, height, onProgress }) {
 
   const host = document.createElement('div');
   host.className = 'offscreen-host';
