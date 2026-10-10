@@ -6,7 +6,7 @@ import * as store from './store.js';
 import { toast, shareToPhotos } from './ui.js';
 
 // アプリのバージョン（更新したら上げる）
-const APP_VERSION = '2.2';
+const APP_VERSION = '2.3';
 
 const CLIP_DURATION_MS = 2000;
 const SIZES = {
@@ -42,7 +42,9 @@ const els = {
 const state = {
   mode: 'vlog',
   filter: 0,
-  photoTime: true,
+  // PHOTO の時刻：入れる写真（both / portrait / landscape / none）と位置（center / bottom）
+  photoTimeTarget: 'both',
+  photoTimePosition: 'center',
   grid: false,
   torch: false,
   facing: 'environment',
@@ -137,8 +139,19 @@ function outputSizeForMain() {
 function currentText() {
   if (state.recording && state.recording.frozenText !== undefined) return state.recording.frozenText;
   if (state.mode === 'vlog') return store.hourLabel(Date.now());
-  if (state.mode === 'photo' && state.photoTime) return store.hourLabel(Date.now());
+  if (state.mode === 'photo' && state.photoTimeTarget !== 'none') return store.hourLabel(Date.now());
   return null; // VIDEO は時刻なし
+}
+
+/** PHOTO では「時刻を入れる写真」の設定に合わせて、縦・横それぞれに入れるか決める */
+function textFor(output) {
+  const text = currentText();
+  if (!text || state.mode !== 'photo') return text;
+  const target = state.photoTimeTarget;
+  if (target === 'both') return text;
+  if (target === 'portrait') return output === 'main' ? text : null;
+  if (target === 'landscape') return output === 'wide' ? text : null;
+  return null;
 }
 
 function renderFrame() {
@@ -146,14 +159,14 @@ function renderFrame() {
   mainRenderer.setSize(mw, mh);
   const opts = {
     filter: state.recording ? state.recording.filter : state.filter,
-    text: currentText(),
     mirror: state.facing === 'user',
     zoom: state.zoom,
+    textPosition: state.mode === 'photo' ? state.photoTimePosition : 'center',
   };
-  const ok = mainRenderer.render(els.camera, opts);
+  const ok = mainRenderer.render(els.camera, { ...opts, text: textFor('main') });
   if (isDualMode()) {
     wideRenderer.setSize(...SIZES.wide);
-    wideRenderer.render(els.camera, opts);
+    wideRenderer.render(els.camera, { ...opts, text: textFor('wide') });
   }
   return ok;
 }
@@ -341,7 +354,7 @@ async function toggleVideo() {
 /** PHOTO：VIDEO と同じく 9:16 と 16:9 の2枚を同時に撮る */
 async function takePhoto() {
   const now = Date.now();
-  const text = state.photoTime ? store.hourLabel(now) : null;
+  const text = state.photoTimeTarget !== 'none' ? store.hourLabel(now) : null;
   state.recording = { kind: 'photo', frozenText: text, filter: state.filter };
   renderFrame();
   const shots = [
@@ -432,6 +445,7 @@ function setMode(mode) {
   document.querySelectorAll('.modes button').forEach((b) => b.classList.toggle('selected', b.dataset.mode === mode));
   els.shutter.className = `shutter mode-${mode}`;
   els.time.classList.toggle('hidden', mode !== 'photo');
+  timeMenu.classList.add('hidden');
   const dual = mode === 'video' || mode === 'photo';
   els.previewWide.classList.toggle('hidden', !dual);
   els.previewMain.querySelector('.badge').classList.toggle('hidden', !dual);
@@ -464,32 +478,61 @@ els.filter.addEventListener('click', () => {
   els.filter.classList.toggle('active', state.filter !== 0);
 });
 
-// 写真の時刻 ON/OFF は選んだまま覚えておく（開き直しても戻らない）
-const PHOTO_TIME_KEY = 'vlogcam-photo-time';
+// 写真の時刻：入れる写真（縦と横 / 縦だけ / 横だけ / 入れない）と位置（真ん中 / 下）を選べる。
+// 選んだ設定は覚えておく（開き直しても戻らない）
+const PHOTO_TIME_KEY = 'vlogcam-photo-time-v2';
+const OLD_PHOTO_TIME_KEY = 'vlogcam-photo-time';
+const timeMenu = $('#time-menu');
 
 function showPhotoTime() {
-  els.time.textContent = state.photoTime ? '時刻 ON' : '時刻 OFF';
-  els.time.classList.toggle('active', state.photoTime);
+  const t = state.photoTimeTarget;
+  const pos = state.photoTimePosition === 'bottom' ? '下' : '真ん中';
+  const which = { both: '', portrait: '・縦だけ', landscape: '・横だけ' }[t] || '';
+  els.time.textContent = t === 'none' ? '時刻 OFF' : `時刻 ${pos}${which}`;
+  els.time.classList.toggle('active', t !== 'none');
+  timeMenu.querySelectorAll('[data-key]').forEach((group) => {
+    const value = group.dataset.key === 'target' ? state.photoTimeTarget : state.photoTimePosition;
+    group.querySelectorAll('button').forEach((b) => b.classList.toggle('selected', b.dataset.value === value));
+  });
+  timeMenu.querySelector('[data-key=position]').classList.toggle('disabled', t === 'none');
 }
 
-try {
-  const saved = localStorage.getItem(PHOTO_TIME_KEY);
-  if (saved !== null) state.photoTime = saved === '1';
-} catch (_) {
-  // 保存できない環境では毎回 ON
-}
-showPhotoTime();
-
-els.time.addEventListener('click', () => {
-  state.photoTime = !state.photoTime;
-  showPhotoTime();
+function savePhotoTime() {
   try {
-    localStorage.setItem(PHOTO_TIME_KEY, state.photoTime ? '1' : '0');
+    localStorage.setItem(PHOTO_TIME_KEY, JSON.stringify({ target: state.photoTimeTarget, position: state.photoTimePosition }));
   } catch (_) {
     // 保存できなくても今回の撮影には反映される
   }
-  toast(state.photoTime ? '写真に時刻を入れます' : '写真に時刻を入れません');
+}
+
+try {
+  const saved = JSON.parse(localStorage.getItem(PHOTO_TIME_KEY) || 'null');
+  if (saved) {
+    if (['both', 'portrait', 'landscape', 'none'].includes(saved.target)) state.photoTimeTarget = saved.target;
+    if (['center', 'bottom'].includes(saved.position)) state.photoTimePosition = saved.position;
+  } else if (localStorage.getItem(OLD_PHOTO_TIME_KEY) === '0') {
+    state.photoTimeTarget = 'none'; // 以前の「時刻 OFF」を引き継ぐ
+  }
+} catch (_) {
+  // 保存できない環境では既定値
+}
+showPhotoTime();
+
+els.time.addEventListener('click', (e) => {
+  e.stopPropagation();
+  timeMenu.classList.toggle('hidden');
 });
+timeMenu.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const button = e.target.closest('button[data-value]');
+  if (!button) return;
+  const key = button.parentElement.dataset.key;
+  if (key === 'target') state.photoTimeTarget = button.dataset.value;
+  else state.photoTimePosition = button.dataset.value;
+  showPhotoTime();
+  savePhotoTime();
+});
+document.addEventListener('click', () => timeMenu.classList.add('hidden'));
 
 els.grid.addEventListener('click', () => {
   state.grid = !state.grid;

@@ -24,7 +24,7 @@
         <svg viewBox="0 0 24 24"><path d="M13 3 5 14h6l-1 7 8-11h-6z" /></svg>
       </button>
       <div class="spacer"></div>
-      <button id="btn-time" class="chip active hidden">時刻 ON</button>
+      <button id="btn-time" class="chip active hidden">時刻 真ん中</button>
       <button id="btn-filter" class="chip">NORMAL</button>
     </header>
 
@@ -81,6 +81,22 @@
     <span class="label"></span>
     <button class="primary">写真アプリに保存</button>
     <button class="close" aria-label="閉じる">×</button>
+  </div>
+
+  <!-- PHOTO の時刻の入れ方 -->
+  <div id="time-menu" class="time-menu hidden">
+    <p>時刻を入れる写真</p>
+    <div class="seg" data-key="target">
+      <button data-value="both">縦と横</button>
+      <button data-value="portrait">縦だけ</button>
+      <button data-value="landscape">横だけ</button>
+      <button data-value="none">入れない</button>
+    </div>
+    <p>位置</p>
+    <div class="seg" data-key="position">
+      <button data-value="center">真ん中</button>
+      <button data-value="bottom">下</button>
+    </div>
   </div>
 
   <div id="toast" class="toast hidden"></div>

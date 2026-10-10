@@ -66,8 +66,11 @@ function makeTexture(gl) {
   return texture;
 }
 
-/** 時刻文字（白・セミボールド・ごく薄い影）を中央に描く。動画・写真で共通。 */
-export function drawTimeText(ctx, w, h, text) {
+/**
+ * 時刻文字（白・セミボールド・ごく薄い影）を描く。動画・写真で共通。
+ * position: 'center'（真ん中・既定） / 'bottom'（下）
+ */
+export function drawTimeText(ctx, w, h, text, position = 'center') {
   ctx.save();
   const fontSize = Math.round(Math.min(w, h) * 0.2);
   ctx.font = `600 ${fontSize}px -apple-system, "SF Pro Display", "Helvetica Neue", "Hiragino Sans", Arial, sans-serif`;
@@ -76,7 +79,8 @@ export function drawTimeText(ctx, w, h, text) {
   ctx.fillStyle = '#ffffff';
   ctx.shadowColor = 'rgba(0, 0, 0, 0.25)';
   ctx.shadowBlur = fontSize * 0.08;
-  ctx.fillText(text, w / 2, h / 2);
+  const y = position === 'bottom' ? h - fontSize * 0.95 : h / 2;
+  ctx.fillText(text, w / 2, y);
   ctx.restore();
 }
 
@@ -134,8 +138,8 @@ export class FrameRenderer {
   }
 
   /** 時刻文字の画像を作ってテクスチャに送る（文字やサイズが変わった時だけ） */
-  updateText(text) {
-    const size = `${this.canvas.width}x${this.canvas.height}`;
+  updateText(text, position = 'center') {
+    const size = `${this.canvas.width}x${this.canvas.height}|${position}`;
     if (text === this.currentText && size === this.currentTextSize) return;
     this.currentText = text;
     this.currentTextSize = size;
@@ -148,7 +152,7 @@ export class FrameRenderer {
     tc.height = h;
     const ctx = tc.getContext('2d');
     ctx.clearRect(0, 0, w, h);
-    drawTimeText(ctx, w, h, text);
+    drawTimeText(ctx, w, h, text, position);
 
     const gl = this.gl;
     gl.activeTexture(gl.TEXTURE1);
@@ -174,7 +178,7 @@ export class FrameRenderer {
     gl.bindTexture(gl.TEXTURE_2D, this.videoTexture);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, video);
 
-    this.updateText(opts.text);
+    this.updateText(opts.text, opts.textPosition);
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, this.textTexture);
 

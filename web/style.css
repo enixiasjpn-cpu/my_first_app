@@ -451,3 +451,23 @@ button:disabled { opacity: 0.35; }
   -webkit-user-select: text;
   user-select: text;
 }
+
+/* ---- PHOTO の時刻メニュー ---- */
+.time-menu {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 60px);
+  right: 12px;
+  z-index: 25;
+  width: min(320px, calc(100vw - 24px));
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(28, 28, 30, 0.96);
+}
+.time-menu p { margin: 4px 2px 8px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.time-menu .seg { display: flex; gap: 4px; background: rgba(255,255,255,0.08); border-radius: 10px; padding: 3px; margin-bottom: 8px; }
+.time-menu .seg button { flex: 1; padding: 8px 0; border-radius: 8px; font-size: 13px; font-weight: 700; color: #fff; }
+.time-menu .seg button.selected { background: #fff; color: #000; }
+.time-menu .seg.disabled { opacity: 0.35; pointer-events: none; }
+@media (orientation: landscape) and (max-height: 600px) {
+  .time-menu { top: 12px; left: 112px; right: auto; }
+}
