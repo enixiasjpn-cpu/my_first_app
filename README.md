@@ -20,7 +20,7 @@ iPhone の Safari で開くだけで使えるブラウザ版。Mac・パソコ�
   - ズームはデジタルズーム、ライトは iPhone の Safari では使えません
   - 16:9 は縦の映像の中央を切り抜くため画質が下がります
 - PHOTO の時刻ボタンでメニューを開き、時刻を入れる写真（縦と横 / 縦だけ / 横だけ / 入れない）と位置（真ん中 / 下）を選べる。設定は覚えておく
-- 時刻の文字：Quicksand Medium（`web/fonts/` に同梱、SIL OFL 1.1）・白 85%・影/縁取りなし。サイズ・不透明度・字間などは `web/js/renderer.js` の `TIME_STYLE` で変更できる
+- 時刻の文字：Nunito Medium (500)（`web/fonts/` に同梱、SIL OFL 1.1）・白 85%・影/縁取りなし。サイズ・不透明度・字間などは `web/js/renderer.js` の `TIME_STYLE` で変更できる
 - 更新：素材一覧の右上「更新」で最新版を読み込み直す（撮った動画・写真は消えない）。版数は `web/js/app.js` の `APP_VERSION`
 - 公開：GitHub Pages（Deploy from a branch / root）→ `https://enixiasjpn-cpu.github.io/my_first_app/web/`
 

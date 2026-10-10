@@ -68,12 +68,12 @@ function makeTexture(gl) {
 
 /**
  * 時刻表示の見た目。ここの値を変えるだけで、プレビュー・動画・写真すべてに反映される。
- * デザイン：02「レトロ・丸み（やや細め）」
- *   フォント Quicksand Medium（web/fonts/ に同梱。OFL ライセンス）
+ *   フォント Nunito Medium (500)（web/fonts/ に同梱。SIL OFL 1.1）
  *   白 #FFFFFF・不透明度 85%・影なし・縁取りなし
  */
 export const TIME_STYLE = {
-  fontFamily: '"VlogCam Time", ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", sans-serif',
+  // Nunito が読み込めない時だけ、丸ゴシック系のフォントに切り替える（角ばった別フォントにならないように）
+  fontFamily: '"Nunito", ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", "Arial Rounded MT Bold", sans-serif',
   fontWeight: 500,
   sizeRatio: 0.17, // 文字の高さ = 画像の短い辺 × この値
   opacity: 0.85,
@@ -81,25 +81,35 @@ export const TIME_STYLE = {
   bottomMargin: 0.95, // 位置「下」のとき、下端から文字中心までの距離（文字サイズに対する割合）
 };
 
+const TIME_FONT_URL = new URL('../fonts/nunito-500.woff2', import.meta.url).href;
 let timeFontReady = null;
 
-/** 時刻用フォントを読み込む（読み込めない環境では丸ゴシック系のシステムフォントで表示） */
+/** 時刻用フォント（Nunito 500）を読み込む。失敗したら1回だけ読み込み直す。 */
 export function loadTimeFont() {
   if (!timeFontReady) {
     timeFontReady = (async () => {
-      try {
-        const face = new FontFace('VlogCam Time', `url(${new URL('../fonts/quicksand-500.woff2', import.meta.url).href})`, {
-          weight: String(TIME_STYLE.fontWeight),
-        });
-        await face.load();
-        document.fonts.add(face);
-        return true;
-      } catch (_) {
-        return false;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const face = new FontFace('Nunito', `url(${TIME_FONT_URL}) format("woff2")`, {
+            weight: String(TIME_STYLE.fontWeight),
+            style: 'normal',
+          });
+          await face.load();
+          document.fonts.add(face);
+          return true;
+        } catch (_) {
+          // もう一度だけ試す
+        }
       }
+      return false;
     })();
   }
   return timeFontReady;
+}
+
+/** 撮影の直前に呼ぶ：フォントの読み込みを最大 timeoutMs だけ待つ（焼き付ける文字を必ず Nunito にするため） */
+export function waitTimeFont(timeoutMs = 1000) {
+  return Promise.race([loadTimeFont(), new Promise((r) => setTimeout(() => r(false), timeoutMs))]);
 }
 
 /**

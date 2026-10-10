@@ -1,4 +1,4 @@
-import { FrameRenderer, loadTimeFont } from './renderer.js';
+import { FrameRenderer, loadTimeFont, waitTimeFont } from './renderer.js';
 import { FILTERS } from './filters.js';
 import { startRecording, extensionFor, canvasVideoTrack } from './recorder.js';
 import { concatenate } from './composer.js';
@@ -6,7 +6,7 @@ import * as store from './store.js';
 import { toast, shareToPhotos } from './ui.js';
 
 // アプリのバージョン（更新したら上げる）
-const APP_VERSION = '2.4';
+const APP_VERSION = '2.5';
 
 const CLIP_DURATION_MS = 2000;
 const SIZES = {
@@ -254,9 +254,14 @@ function setRecordingUI(on) {
   els.snap.classList.toggle('hidden', !videoRecording);
 }
 
+let vlogStarting = false;
+
 /** VLOG：1タップで2秒録画 → 自動停止 → アプリ内に保存 */
 async function recordVlogClip() {
-  if (state.recording) return;
+  if (state.recording || vlogStarting) return;
+  vlogStarting = true;
+  await waitTimeFont();
+  vlogStarting = false;
   const startedAt = Date.now();
   const filter = state.filter;
   state.recording = { kind: 'vlog', frozenText: store.hourLabel(startedAt), filter, startedAt };
@@ -353,6 +358,7 @@ async function toggleVideo() {
 
 /** PHOTO：VIDEO と同じく 9:16 と 16:9 の2枚を同時に撮る */
 async function takePhoto() {
+  await waitTimeFont();
   const now = Date.now();
   const text = state.photoTimeTarget !== 'none' ? store.hourLabel(now) : null;
   state.recording = { kind: 'photo', frozenText: text, filter: state.filter };
