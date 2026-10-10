@@ -6,7 +6,7 @@ import * as store from './store.js';
 import { toast, shareToPhotos } from './ui.js';
 
 // アプリのバージョン（更新したら上げる）
-const APP_VERSION = '2.1';
+const APP_VERSION = '2.2';
 
 const CLIP_DURATION_MS = 2000;
 const SIZES = {
@@ -464,10 +464,31 @@ els.filter.addEventListener('click', () => {
   els.filter.classList.toggle('active', state.filter !== 0);
 });
 
-els.time.addEventListener('click', () => {
-  state.photoTime = !state.photoTime;
+// 写真の時刻 ON/OFF は選んだまま覚えておく（開き直しても戻らない）
+const PHOTO_TIME_KEY = 'vlogcam-photo-time';
+
+function showPhotoTime() {
   els.time.textContent = state.photoTime ? '時刻 ON' : '時刻 OFF';
   els.time.classList.toggle('active', state.photoTime);
+}
+
+try {
+  const saved = localStorage.getItem(PHOTO_TIME_KEY);
+  if (saved !== null) state.photoTime = saved === '1';
+} catch (_) {
+  // 保存できない環境では毎回 ON
+}
+showPhotoTime();
+
+els.time.addEventListener('click', () => {
+  state.photoTime = !state.photoTime;
+  showPhotoTime();
+  try {
+    localStorage.setItem(PHOTO_TIME_KEY, state.photoTime ? '1' : '0');
+  } catch (_) {
+    // 保存できなくても今回の撮影には反映される
+  }
+  toast(state.photoTime ? '写真に時刻を入れます' : '写真に時刻を入れません');
 });
 
 els.grid.addEventListener('click', () => {
